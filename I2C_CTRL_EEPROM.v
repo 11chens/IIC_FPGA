@@ -18,6 +18,9 @@ module I2C_CTRL_EEPROM(
 	
 	parameter	I2C_FREQ	=	250;//	50M/250=200KHZ
 
+	reg	[4:0]state;
+	reg	r_sda,r_scl;
+
 	localparam	IDLE		=	'd15;
 
 	localparam	START		=	'd0;
@@ -38,12 +41,10 @@ module I2C_CTRL_EEPROM(
 
 	localparam	STOP		=	'd14;
 
-	wire high_flag,low_flag;
-	wire wait_input;
-	reg	[4:0]state;
-	reg	r_sda,r_scl;
 	reg [7:0]clk_cnt;
+	wire high_flag,low_flag;
 	reg [4:0]trcnt;
+	wire wait_input;
 
 
 	always @(posedge clk or negedge rst_n) 
@@ -191,7 +192,14 @@ module I2C_CTRL_EEPROM(
 				LD_ACK:begin
 					if (high_flag) begin
 						if (!SDA) begin
-							state<=WR_DAT;
+							if (!rd_flag) begin
+								r_sda<=1'b0;
+								state<=WR_DAT;	//******WRITE******//
+							end
+							else begin
+								r_sda<=1'b1;
+								state<=RD_START;//******READ******//
+							end
 						end
 						else begin
 							state<=IDLE;
@@ -201,6 +209,8 @@ module I2C_CTRL_EEPROM(
 						state<=LD_ACK;
 					end
 				end
+				
+//********************WRITE DATA********************//
 
 				WR_DAT:begin
 					if(low_flag)begin
@@ -222,14 +232,7 @@ module I2C_CTRL_EEPROM(
 				WR_DAT_ACK:begin
 					if (high_flag) begin
 						if (!SDA) begin
-							if (!rd_flag) begin
-								r_sda<=1'b0;
-								state<=STOP;	//******WRITE******//
-							end
-							else begin
-								r_sda<=1'b1;
-								state<=RD_START;//******READ******//
-							end
+							state<=STOP;
 						end
 						else begin
 							state<=IDLE;
@@ -240,7 +243,7 @@ module I2C_CTRL_EEPROM(
 					end
 				end
 
-//********************READ BEGIN********************//
+//********************READ START********************//
 
 				RD_START:begin
 					if (high_flag) begin
@@ -309,7 +312,7 @@ module I2C_CTRL_EEPROM(
 					end
 				end
 				
-//********************READ OVER********************//
+//********************READ END********************//
 
 //********************WRITE & READ STOP********************//
 				STOP:begin
@@ -331,7 +334,4 @@ module I2C_CTRL_EEPROM(
 		end
 
 endmodule
-
-
-
 
