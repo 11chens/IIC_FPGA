@@ -12,14 +12,14 @@ module I2C_CTRL_EEPROM(
 
 	inout	wire	SDA,
 	output	wire	SCL,	
-
-	output	reg		i2c_done
+	output	reg [4:0]c_state,
+	output	reg		i2c_done	
 );
 	
 	parameter	I2C_FREQ	=	250;//	50M/250=200KHZ
 
-	reg	[4:0]state;
 	reg	r_sda,r_scl;
+	reg		[4:0]	state;
 
 	localparam	IDLE		=	'd15;
 
@@ -80,7 +80,8 @@ module I2C_CTRL_EEPROM(
 
 	assign SDA = (wait_input==1'b1)?1'bz:r_sda;//((r_sda)?1'bz:1'b0)
 	assign SCL = r_scl;
-
+	
+	
 	always @(posedge clk or negedge rst_n) 
 		if (!rst_n) begin
 			state<=IDLE;
@@ -89,6 +90,7 @@ module I2C_CTRL_EEPROM(
 			i2c_done<=1'b0;
 		end
 		else begin
+			c_state<=state;
 			case(state)
 				IDLE:begin
 					i2c_done<=1'b0;
@@ -113,7 +115,12 @@ module I2C_CTRL_EEPROM(
 				WR_CTRL:begin
 					if (low_flag) begin
 						if (trcnt<4'd8) begin
-							r_sda<=wr_dev[4'd7-trcnt];
+							if (!rd_flag) begin
+								r_sda<=wr_dev[4'd7-trcnt];
+							end
+							else begin
+								r_sda<=rd_dev[4'd7-trcnt];
+							end
 							trcnt<=trcnt+1'd1;
 						end
 						else begin
@@ -193,11 +200,9 @@ module I2C_CTRL_EEPROM(
 					if (high_flag) begin
 						if (!SDA) begin
 							if (!rd_flag) begin
-								r_sda<=1'b0;
 								state<=WR_DAT;	//******WRITE******//
 							end
 							else begin
-								r_sda<=1'b1;
 								state<=RD_START;//******READ******//
 							end
 						end
@@ -205,6 +210,7 @@ module I2C_CTRL_EEPROM(
 							state<=IDLE;
 						end
 					end
+					
 					else begin
 						state<=LD_ACK;
 					end
@@ -246,9 +252,12 @@ module I2C_CTRL_EEPROM(
 //********************READ START********************//
 
 				RD_START:begin
-					if (high_flag) begin
-						r_sda<=1'b0;
+					if (low_flag) begin
+						r_sda<=1'b1;
+					end
+					else if (high_flag) begin
 						state<=RD_CTRL;
+						r_sda<=1'b0;
 					end
 					else begin
 						state<=RD_START;
@@ -268,7 +277,7 @@ module I2C_CTRL_EEPROM(
 						end
 					end
 					else begin
-						state<=WR_DAT;
+						state<=RD_CTRL;
 					end
 				end
 
@@ -299,7 +308,7 @@ module I2C_CTRL_EEPROM(
 						end
 					end
 					else begin
-						state<=WR_DAT;
+						state<=RD_DAT;
 					end
 				end
 
@@ -334,4 +343,7 @@ module I2C_CTRL_EEPROM(
 		end
 
 endmodule
+
+
+
 
